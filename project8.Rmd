@@ -1,0 +1,131 @@
+---
+title: "Project8"
+author: "Mohamed Adel Omar"
+date: "7/12/2020"
+output: html_document
+---
+## Overview
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+```
+
+##  Downloading and Reading data 
+Load the packages into R. Getting, Downloading (if needed) and load the data. 
+Identifying “NA”, “” and “#DIV/0!” as NA strings. 
+
+```{r loaddata}
+
+library(caret)
+set.seed(233)
+
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+path <- paste(getwd(),"/", "data", sep="")
+train_path <- file.path(path, "pml-training.csv")
+test_path <- file.path(path, "pml-testing.csv")
+
+if (!file.exists(train_path)) {
+  download.file(train_url, destfile=train_path)
+}
+if (!file.exists(test_path)) {
+  download.file(test_url, destfile=test_path)
+}
+train_data <- read.csv(train_path, na.strings=c("NA","#DIV/0!",""))
+test_data <- read.csv(test_path, na.strings=c("NA","#DIV/0!",""))
+
+```
+
+### Data Claening
+Removing columns that are not needed and columns that contain NAs for the model.
+
+```{r Cleaning}
+train_data <- train_data[, 8:length(colnames(train_data))]
+train_data <- train_data[, colSums(is.na(train_data))== 0] 
+```
+
+### Data Slicing
+Split the dataset into a training set (for model training) and a validation set (for predicting the out of sample error), splitting on the class variable with a 80-20 split.
+
+```{r Slicing}
+train_in <- createDataPartition(train_data$classe, p = 0.8, list = FALSE)
+validation_data <- train_data[-train_in, ]
+reduced_ds <- train_data[train_in, ]
+```
+
+### Modeling the training set
+Training the model using Random Forest, Gradient Boosting and Decision Trees. 
+Our models will be fitted on the train data set, and tested on the validation data. Once the most accurate model is chosen, it will be tested on the original Testing data set.
+```{r Modeling,  results=FALSE}
+rf_model <- train(classe ~ ., data=reduced_ds, method="rf",
+                  trControl= trainControl(method="cv", 5))
+gbm_model <- train(classe ~ ., data=reduced_ds, method="gbm",
+                  trControl= trainControl(method="cv", 5))
+cart_model <- train(classe ~ ., data=reduced_ds, method="rpart",
+                   trControl= trainControl(method="cv", 5))
+```
+
+### Expected out-of-sample error
+
+```{r Results}
+rf_predict <- predict(rf_model, validation_data)
+confusionMatrix(validation_data$classe, rf_predict)
+
+gbm_predict <- predict(gbm_model, validation_data)
+confusionMatrix(validation_data$classe, gbm_predict)
+
+cart_predict <- predict(cart_model, validation_data)
+confusionMatrix(validation_data$classe, cart_predict)
+
+Accuracy_Results <- data.frame(
+  Model = c('Random Forest', 'Gradient Boosting', 'Decision Trees'),
+  Accuracy = rbind(confusionMatrix(validation_data$classe, rf_predict)$overall[1], 
+                   confusionMatrix(validation_data$classe, gbm_predict)$overall[1],
+                   confusionMatrix(  validation_data$classe, cart_predict ,)$overall[1])
+)
+print(Accuracy_Results)
+
+
+plot(confusionMatrix(validation_data$classe, rf_predict)$table, 
+     col = confusionMatrix(validation_data$classe, rf_predict)$byClass, 
+     main = paste("Random Forest - Accuracy =",
+                  round(confusionMatrix(validation_data$classe, rf_predict)$overall['Accuracy'], 4)))
+
+plot(confusionMatrix(validation_data$classe, gbm_predict)$table, 
+     col = confusionMatrix(validation_data$classe, gbm_predict)$byClass, 
+     main = paste("Gradient Boosting - Accuracy =",
+                  round(confusionMatrix(validation_data$classe, gbm_predict)$overall['Accuracy'], 4)))
+
+plot(confusionMatrix(validation_data$classe, cart_predict)$table, 
+     col = confusionMatrix(validation_data$classe, cart_predict)$byClass, 
+     main = paste("Decision Trees - Accuracy =",
+                  round(confusionMatrix(validation_data$classe, cart_predict)$overall['Accuracy'], 4)))
+
+```  
+ 
+Random Forest algorithm performed better than Decision Trees and Gradient Boosting algorithms.
+
+### Apply model to testing set
+
+We applied the three models on the 20 observations based on the other information we know about these observations contained in the testing dataset.
+The Random Forest algorithm and Gradient Boosting algorithm has the same results.
+In the last figure, we plot the top 20 variables impact on outcome.
+```{r Testing}
+rf_results <- predict(rf_model,  test_data)
+rf_results
+
+
+gbm_results <- predict(gbm_model,  test_data)
+gbm_results
+
+cart_results <- predict(cart_model,  test_data)
+cart_results
+
+plot(varImp(rf_model), top = 20)
+```
+
