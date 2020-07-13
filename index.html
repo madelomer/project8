@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Project8 by madelomer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Project8</h1>
+      <h2 class="project-tagline">Project8</h2>
+      <a href="https://github.com/madelomer/project8" class="btn">View on GitHub</a>
+      <a href="https://github.com/madelomer/project8/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/madelomer/project8/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      
+<div>
+<div id="header">
+<h1>
+<a id="project8" class="anchor" href="#project8" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project8</h1>
+<h4>
+<a id="mohamed-adel-omar" class="anchor" href="#mohamed-adel-omar" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Mohamed Adel Omar</h4>
+<h4>
+<a id="7122020" class="anchor" href="#7122020" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>7/12/2020</h4>
+</div>
+<div id="overview">
+<h2>
+<a id="overview" class="anchor" href="#overview" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Overview</h2>
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <a href="http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har">http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har</a> (see the section on the Weight Lifting Exercise Dataset).</p>
+</div>
+<div id="downloading-and-reading-data">
+<h2>
+<a id="downloading-and-reading-data" class="anchor" href="#downloading-and-reading-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Downloading and Reading data</h2>
+<p>Load the packages into R. Getting, Downloading (if needed) and load the data. Identifying “NA”, “” and “#DIV/0!” as NA strings.</p>
+<pre><code>library(caret)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre><code>## Loading required package: ggplot2</code></pre>
+<pre><code>set.seed(233)
+<p>train_url &lt;- "<a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a>"
+test_url &lt;- "<a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv</a>"</p>
+<p>path &lt;- paste(getwd(),"/", "data", sep="")
+train_path &lt;- file.path(path, "pml-training.csv")
+test_path &lt;- file.path(path, "pml-testing.csv")</p>
+<p>if (!file.exists(train_path)) {
+download.file(train_url, destfile=train_path)
+}
+if (!file.exists(test_path)) {
+download.file(test_url, destfile=test_path)
+}
+train_data &lt;- read.csv(train_path, na.strings=c("NA","#DIV/0!",""))
+test_data &lt;- read.csv(test_path, na.strings=c("NA","#DIV/0!",""))</p></code></pre>
+<div id="data-claening">
+<h3>
+<a id="data-claening" class="anchor" href="#data-claening" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Data Claening</h3>
+<p>Removing columns that are not needed and columns that contain NAs for the model.</p>
+<pre><code>train_data &lt;- train_data[, 8:length(colnames(train_data))]
+train_data &lt;- train_data[, colSums(is.na(train_data))== 0] </code></pre>
+</div>
+<div id="data-slicing">
+<h3>
+<a id="data-slicing" class="anchor" href="#data-slicing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Data Slicing</h3>
+<p>Split the dataset into a training set (for model training) and a validation set (for predicting the out of sample error), splitting on the class variable with a 80-20 split.</p>
+<pre><code>train_in &lt;- createDataPartition(train_data$classe, p = 0.8, list = FALSE)
+validation_data &lt;- train_data[-train_in, ]
+reduced_ds &lt;- train_data[train_in, ]</code></pre>
+</div>
+<div id="modeling-the-training-set">
+<h3>
+<a id="modeling-the-training-set" class="anchor" href="#modeling-the-training-set" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Modeling the training set</h3>
+<p>Training the model using Random Forest, Gradient Boosting and Decision Trees. Our models will be fitted on the train data set, and tested on the validation data. Once the most accurate model is chosen, it will be tested on the original Testing data set.</p>
+<pre><code>rf_model &lt;- train(classe ~ ., data=reduced_ds, method="rf",
+                  trControl= trainControl(method="cv", 5))
+gbm_model &lt;- train(classe ~ ., data=reduced_ds, method="gbm",
+                  trControl= trainControl(method="cv", 5))
+cart_model &lt;- train(classe ~ ., data=reduced_ds, method="rpart",
+                   trControl= trainControl(method="cv", 5))</code></pre>
+</div>
+<div id="expected-out-of-sample-error">
+<h3>
+<a id="expected-out-of-sample-error" class="anchor" href="#expected-out-of-sample-error" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Expected out-of-sample error</h3>
+<pre><code>rf_predict &lt;- predict(rf_model, validation_data)
+confusionMatrix(validation_data$classe, rf_predict)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1115    0    1    0    0
+##          B   13  743    3    0    0
+##          C    0    3  677    4    0
+##          D    0    0    7  636    0
+##          E    0    0    0    3  718
+## 
+## Overall Statistics
+##                                          
+##                Accuracy : 0.9913         
+##                  95% CI : (0.9879, 0.994)
+##     No Information Rate : 0.2875         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.989          
+##                                          
+##  Mcnemar's Test P-Value : NA             
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9885   0.9960   0.9840   0.9891   1.0000
+## Specificity            0.9996   0.9950   0.9978   0.9979   0.9991
+## Pos Pred Value         0.9991   0.9789   0.9898   0.9891   0.9958
+## Neg Pred Value         0.9954   0.9991   0.9966   0.9979   1.0000
+## Prevalence             0.2875   0.1902   0.1754   0.1639   0.1830
+## Detection Rate         0.2842   0.1894   0.1726   0.1621   0.1830
+## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
+## Balanced Accuracy      0.9941   0.9955   0.9909   0.9935   0.9995</code></pre>
+<pre><code>gbm_predict &lt;- predict(gbm_model, validation_data)
+confusionMatrix(validation_data$classe, gbm_predict)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1093   13    7    2    1
+##          B   28  700   31    0    0
+##          C    0    9  664   10    1
+##          D    0    2   21  619    1
+##          E    2    9    3   11  696
+## 
+## Overall Statistics
+##                                          
+##                Accuracy : 0.9615         
+##                  95% CI : (0.955, 0.9673)
+##     No Information Rate : 0.2863         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.9513         
+##                                          
+##  Mcnemar's Test P-Value : 1.633e-07      
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9733   0.9550   0.9146   0.9642   0.9957
+## Specificity            0.9918   0.9815   0.9937   0.9927   0.9922
+## Pos Pred Value         0.9794   0.9223   0.9708   0.9627   0.9653
+## Neg Pred Value         0.9893   0.9896   0.9809   0.9930   0.9991
+## Prevalence             0.2863   0.1868   0.1851   0.1637   0.1782
+## Detection Rate         0.2786   0.1784   0.1693   0.1578   0.1774
+## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
+## Balanced Accuracy      0.9825   0.9682   0.9542   0.9784   0.9940</code></pre>
+<pre><code>cart_predict &lt;- predict(cart_model, validation_data)
+confusionMatrix(validation_data$classe, cart_predict)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1010   18   85    0    3
+##          B  313  267  179    0    0
+##          C  329   22  333    0    0
+##          D  289  119  235    0    0
+##          E  103   91  204    0  323
+## 
+## Overall Statistics
+##                                          
+##                Accuracy : 0.4927         
+##                  95% CI : (0.477, 0.5085)
+##     No Information Rate : 0.521          
+##     P-Value [Acc &gt; NIR] : 0.9998         
+##                                          
+##                   Kappa : 0.3369         
+##                                          
+##  Mcnemar's Test P-Value : NA             
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.4941  0.51644  0.32143       NA  0.99080
+## Specificity            0.9436  0.85555  0.87842   0.8361  0.88935
+## Pos Pred Value         0.9050  0.35178  0.48684       NA  0.44799
+## Neg Pred Value         0.6316  0.92099  0.78296       NA  0.99906
+## Prevalence             0.5210  0.13179  0.26408   0.0000  0.08310
+## Detection Rate         0.2575  0.06806  0.08488   0.0000  0.08233
+## Detection Prevalence   0.2845  0.19347  0.17436   0.1639  0.18379
+## Balanced Accuracy      0.7189  0.68600  0.59992       NA  0.94007</code></pre>
+<pre><code>Accuracy_Results &lt;- data.frame(
+  Model = c('Random Forest', 'Gradient Boosting', 'Decision Trees'),
+  Accuracy = rbind(confusionMatrix(validation_data$classe, rf_predict)$overall[1], 
+                   confusionMatrix(validation_data$classe, gbm_predict)$overall[1],
+                   confusionMatrix(  validation_data$classe, cart_predict ,)$overall[1])
+)
+print(Accuracy_Results)</code></pre>
+<pre><code>##               Model  Accuracy
+## 1     Random Forest 0.9913332
+## 2 Gradient Boosting 0.9615090
+## 3    Decision Trees 0.4927352</code></pre>
+<pre><code>plot(confusionMatrix(validation_data$classe, rf_predict)$table, 
+     col = confusionMatrix(validation_data$classe, rf_predict)$byClass, 
+     main = paste("Random Forest - Accuracy =",
+                  round(confusionMatrix(validation_data$classe, rf_predict)$overall['Accuracy'], 4)))</code></pre>
+<p><img width="672"></p>
+<pre><code>plot(confusionMatrix(validation_data$classe, gbm_predict)$table, 
+     col = confusionMatrix(validation_data$classe, gbm_predict)$byClass, 
+     main = paste("Gradient Boosting - Accuracy =",
+                  round(confusionMatrix(validation_data$classe, gbm_predict)$overall['Accuracy'], 4)))</code></pre>
+<p><img width="672"></p>
+<pre><code>plot(confusionMatrix(validation_data$classe, cart_predict)$table, 
+     col = confusionMatrix(validation_data$classe, cart_predict)$byClass, 
+     main = paste("Decision Trees - Accuracy =",
+                  round(confusionMatrix(validation_data$classe, cart_predict)$overall['Accuracy'], 4)))</code></pre>
+<p><img width="672"></p>
+<p>Random Forest algorithm performed better than Decision Trees and Gradient Boosting algorithms.</p>
+</div>
+<div id="apply-model-to-testing-set">
+<h3>
+<a id="apply-model-to-testing-set" class="anchor" href="#apply-model-to-testing-set" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Apply model to testing set</h3>
+<p>We applied the three models on the 20 observations based on the other information we know about these observations contained in the testing dataset. The Random Forest algorithm and Gradient Boosting algorithm has the same results. In the last figure, we plot the top 20 variables impact on outcome.</p>
+<pre><code>rf_results &lt;- predict(rf_model,  test_data)
+rf_results</code></pre>
+<pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E</code></pre>
+<pre><code>gbm_results &lt;- predict(gbm_model,  test_data)
+gbm_results</code></pre>
+<pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
+## Levels: A B C D E</code></pre>
+<pre><code>cart_results &lt;- predict(cart_model,  test_data)
+cart_results</code></pre>
+<pre><code>##  [1] C A C A A C C A A A C C C A C A A A A C
+## Levels: A B C D E</code></pre>
+<pre><code>plot(varImp(rf_model), top = 20)</code></pre>
+<p><img width="672"></p>
+</div>
+</div>
+</div>
+&lt;script&gt;
+
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+
+
+&lt;/script&gt;
+
+&lt;script&gt;
+$(document).ready(function () {
+  window.buildTabsets("TOC");
+});
+
+$(document).ready(function () {
+  $('.tabset-dropdown &gt; .nav-tabs &gt; li').click(function () {
+    $(this).parent().toggleClass('nav-tabs-open')
+  });
+});
+&lt;/script&gt;
+
+
+&lt;script&gt;
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+&lt;/script&gt;
+
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/madelomer/project8">Project8</a> is maintained by <a href="https://github.com/madelomer">madelomer</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
