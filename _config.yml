@@ -1,0 +1,8 @@
+title: Project8
+description: Project8
+google_analytics: 
+show_downloads: true
+theme: jekyll-theme-cayman
+
+gems:
+  - jekyll-mentions
